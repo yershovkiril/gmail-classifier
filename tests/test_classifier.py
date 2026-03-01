@@ -4,7 +4,7 @@ from src.services.classifier import EmailClassifier
 
 
 @patch("src.services.classifier.get_llm")
-def test_classifier_initialization(mock_get_llm):
+def test_classifier_initialization(mock_get_llm: MagicMock) -> None:
     # Mock LLM to prevent real calls
     mock_llm = MagicMock()
     mock_get_llm.return_value = mock_llm
@@ -19,7 +19,7 @@ def test_classifier_initialization(mock_get_llm):
     assert "Invoices / Bills" in formatted
 
 @patch("src.services.classifier.get_llm")
-def test_classify_email_success(mock_get_llm):
+def test_classify_email_success(mock_get_llm: MagicMock) -> None:
     # Setup mock LLM chain invocation
     mock_chain = MagicMock()
 
@@ -38,7 +38,7 @@ def test_classify_email_success(mock_get_llm):
         # Hacky mock for the pipeline
         mock_pipeline = MagicMock()
         mock_pipeline.invoke.return_value = MockResult()
-        classifier.prompt.__or__.return_value = mock_pipeline
+        classifier.prompt.__or__.return_value = mock_pipeline  # type: ignore
 
         # Test data
         email_data = {
@@ -53,7 +53,7 @@ def test_classify_email_success(mock_get_llm):
         assert result == "Invoices / Bills"
 
 @patch("src.services.classifier.get_llm")
-def test_classify_email_failure_fallback(mock_get_llm):
+def test_classify_email_failure_fallback(mock_get_llm: MagicMock) -> None:
     classifier = EmailClassifier()
 
     # Mock chain to throw an exception
@@ -61,7 +61,7 @@ def test_classify_email_failure_fallback(mock_get_llm):
         mock_pipeline = MagicMock()
         # Exception thrown during structured parsing or API call
         mock_pipeline.invoke.side_effect = Exception("API Timeout")
-        classifier.prompt.__or__.return_value = mock_pipeline
+        classifier.prompt.__or__.return_value = mock_pipeline  # type: ignore
 
         result = classifier.classify_email({"id": "err"})
 

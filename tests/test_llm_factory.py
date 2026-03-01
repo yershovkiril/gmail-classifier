@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -6,7 +6,7 @@ from src.services.llm_factory import get_llm
 
 
 @patch("src.services.llm_factory.settings")
-def test_get_llm_vertexai(mock_settings):
+def test_get_llm_vertexai(mock_settings: MagicMock) -> None:
     mock_settings.llm_provider = "vertexai"
     mock_settings.llm_model_name = "gemini-1.5-pro"
 
@@ -16,7 +16,7 @@ def test_get_llm_vertexai(mock_settings):
         mock_vertex.assert_called_once_with(model_name="gemini-1.5-pro", temperature=0.0)
 
 @patch("src.services.llm_factory.settings")
-def test_get_llm_openai(mock_settings):
+def test_get_llm_openai(mock_settings: MagicMock) -> None:
     mock_settings.llm_provider = "openai"
     mock_settings.llm_model_name = "gpt-4o"
     mock_settings.openai_api_key = "test-key"
@@ -26,7 +26,7 @@ def test_get_llm_openai(mock_settings):
         mock_openai.assert_called_once_with(model="gpt-4o", api_key="test-key", temperature=0.0)
 
 @patch("src.services.llm_factory.settings")
-def test_get_llm_openai_missing_key(mock_settings):
+def test_get_llm_openai_missing_key(mock_settings: MagicMock) -> None:
     mock_settings.llm_provider = "openai"
     mock_settings.openai_api_key = None
 
@@ -34,7 +34,7 @@ def test_get_llm_openai_missing_key(mock_settings):
         get_llm()
 
 @patch("src.services.llm_factory.settings")
-def test_get_llm_unsupported(mock_settings):
+def test_get_llm_unsupported(mock_settings: MagicMock) -> None:
     mock_settings.llm_provider = "invalid"
     with pytest.raises(ValueError, match="Unsupported LLM provider: invalid"):
         get_llm()

@@ -7,8 +7,10 @@ from src.config import settings
 from src.services.gmail import GmailClient
 
 
+import typing
+
 @pytest.fixture
-def mock_creds():
+def mock_creds() -> typing.Any:
     with patch("src.services.gmail.Credentials"):
         # Mocking credentials returning from static method or mock object
         mock = MagicMock()
@@ -18,7 +20,7 @@ def mock_creds():
 @patch("src.services.gmail.build")
 @patch("src.services.gmail.os.path.exists")
 @patch("src.services.gmail.Credentials.from_authorized_user_file")
-def test_gmail_client_initialization_success(mock_from_file, mock_exists, mock_build, mock_creds):
+def test_gmail_client_initialization_success(mock_from_file: MagicMock, mock_exists: MagicMock, mock_build: MagicMock, mock_creds: MagicMock) -> None:
     mock_exists.return_value = True
     mock_from_file.return_value = mock_creds
 
@@ -38,7 +40,7 @@ def test_gmail_client_initialization_success(mock_from_file, mock_exists, mock_b
 
 @patch("src.services.gmail.build")
 @patch.object(GmailClient, "_authenticate")
-def test_gmail_client_auth_failure(mock_auth, mock_build):
+def test_gmail_client_auth_failure(mock_auth: MagicMock, mock_build: MagicMock) -> None:
     mock_auth.return_value = None
 
     with pytest.raises(ValueError, match="Failed to authenticate"):
@@ -46,7 +48,7 @@ def test_gmail_client_auth_failure(mock_auth, mock_build):
 
 @patch("src.services.gmail.build")
 @patch.object(GmailClient, "_authenticate")
-def test_get_emails_to_process(mock_auth, mock_build):
+def test_get_emails_to_process(mock_auth: MagicMock, mock_build: MagicMock) -> None:
     mock_creds = MagicMock()
     mock_auth.return_value = mock_creds
 
@@ -108,7 +110,7 @@ def test_get_emails_to_process(mock_auth, mock_build):
         assert emails[1]["body"] == "Test Body"
 
 @patch.object(GmailClient, "_authenticate")
-def test_apply_category_and_mark_processed(mock_auth):
+def test_apply_category_and_mark_processed(mock_auth: MagicMock) -> None:
     mock_auth.return_value = MagicMock()
 
     with patch.object(GmailClient, "_initialize_labels"):
