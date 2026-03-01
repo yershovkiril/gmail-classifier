@@ -55,7 +55,7 @@ Deploying to production takes just a single command. The script will automatical
 make deploy PROJECT_ID=your-gcp-project-id
 ```
 
-### 3. Testing
+### Testing
 To run the automated test suite locally:
 ```bash
 make test
