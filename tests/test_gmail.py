@@ -1,4 +1,5 @@
 import base64
+import typing
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,8 +7,6 @@ import pytest
 from src.config import settings
 from src.services.gmail import GmailClient
 
-
-import typing
 
 @pytest.fixture
 def mock_creds() -> typing.Any:
