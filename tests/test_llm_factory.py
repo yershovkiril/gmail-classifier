@@ -15,7 +15,7 @@ def test_get_llm_vertexai(mock_settings: MagicMock) -> None:
     # Needs to be mocked to prevent real GCP auth calls during tests
     with patch("src.services.llm_factory.ChatGoogleGenerativeAI") as mock_vertex:
         get_llm()
-        mock_vertex.assert_called_once_with(model="gemini-2.5-flash", temperature=0.0, google_api_key=mock_settings.gemini_api_key)
+        mock_vertex.assert_called_once_with(model="gemini-2.5-flash", temperature=0.0)
 
 @patch("src.services.llm_factory.settings")
 def test_get_llm_openai(mock_settings: MagicMock) -> None:

@@ -5,8 +5,8 @@ import time
 
 from src.config import settings
 from src.services.classifier import EmailClassifier
-from src.services.gmail import GmailClient
 from src.services.cleanup import run_cleanup
+from src.services.gmail import GmailClient
 from src.services.summary import generate_daily_summary
 
 # Setup logging
@@ -66,9 +66,9 @@ def process_emails() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AI Gmail Agent")
     parser.add_argument(
-        "--mode", 
-        type=str, 
-        choices=["classify", "cleanup", "summary"], 
+        "--mode",
+        type=str,
+        choices=["classify", "cleanup", "summary"],
         default="classify",
         help="Execution mode (classify new emails, cleanup old unread, or generate daily summary)."
     )

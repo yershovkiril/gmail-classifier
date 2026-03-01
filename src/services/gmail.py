@@ -1,9 +1,9 @@
 import base64
 import logging
 import os.path
+from email.message import EmailMessage
 from typing import Any
 
-from email.message import EmailMessage
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
@@ -20,8 +20,8 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://www.googleapi
 
 class GmailClient:
     SYSTEM_LABELS = {
-        "INBOX", "UNREAD", "SENT", "DRAFT", "SPAM", "TRASH", "STARRED", 
-        "IMPORTANT", "CHAT", "CATEGORY_PERSONAL", "CATEGORY_SOCIAL", 
+        "INBOX", "UNREAD", "SENT", "DRAFT", "SPAM", "TRASH", "STARRED",
+        "IMPORTANT", "CHAT", "CATEGORY_PERSONAL", "CATEGORY_SOCIAL",
         "CATEGORY_PROMOTIONS", "CATEGORY_UPDATES", "CATEGORY_FORUMS"
     }
 
@@ -167,7 +167,7 @@ class GmailClient:
                 user_labels.append(name)
         return user_labels
 
-    def apply_category_and_mark_processed(self, message_id: str, category_name: str, existing_label_ids: list[str] = None) -> None:
+    def apply_category_and_mark_processed(self, message_id: str, category_name: str, existing_label_ids: list[str] | None = None) -> None:
         """
         Adds the category label and the PROCESSED_BY_AI label to the message.
         Also strips out previous custom tags.
@@ -177,7 +177,7 @@ class GmailClient:
             processed_label_id = self.get_or_create_label(settings.processed_label_name)
 
             labels_to_remove = []
-            
+
             # Remove any pre-existing custom user labels
             if existing_label_ids:
                 user_label_ids = {l_id for name, l_id in self._label_cache.items() if name not in self.SYSTEM_LABELS}

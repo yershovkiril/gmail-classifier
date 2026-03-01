@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def load_categories_from_file(self) -> "Settings":
         try:
-            with open(self.categories_file, "r", encoding="utf-8") as f:
+            with open(self.categories_file, encoding="utf-8") as f:
                 self.categories = yaml.safe_load(f) or {}
         except Exception as e:
             print(f"Warning: Could not load {self.categories_file}: {e}")

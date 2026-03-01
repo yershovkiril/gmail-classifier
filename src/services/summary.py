@@ -1,8 +1,9 @@
-import logging
 import datetime
+import logging
+
 import markdown
-from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
 
 from src.config import settings
 from src.services.gmail import GmailClient
@@ -12,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 def generate_daily_summary() -> None:
     """
-    Fetches all emails from the last N hours, generates an LLM digest, 
+    Fetches all emails from the last N hours, generates an LLM digest,
     and sends it to the user.
     """
     logger.info(f"Starting Daily Summary generation task for last {settings.summary_frequency_hours} hours...")
-    
+
     try:
         gmail_client = GmailClient()
     except Exception as e:
@@ -62,7 +63,7 @@ Your task is to organize this chaos into a highly readable, concise Daily Digest
 
 Write the Digest now:"""
     )
-    
+
     try:
         llm = get_llm()
         chain = prompt | llm | StrOutputParser()
@@ -71,10 +72,10 @@ Write the Digest now:"""
             "emails_content": emails_content,
             "summary_frequency_hours": settings.summary_frequency_hours
         })
-        
+
         # Convert Markdown to basic HTML for the email
         html_content = markdown.markdown(digest_markdown)
-        
+
         html_body = f"""
         <html>
             <head>
@@ -101,10 +102,10 @@ Write the Digest now:"""
             </body>
         </html>
         """
-        
+
         logger.info("Digest generated successfully. Sending email...")
         subject = f"Your Daily Inbox Summary - {datetime.date.today().strftime('%b %d')}"
         gmail_client.send_email(subject, html_body)
-        
+
     except Exception as e:
         logger.error(f"Failed to generate or send the Daily Summary: {e}")

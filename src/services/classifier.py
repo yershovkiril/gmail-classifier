@@ -4,8 +4,8 @@ from typing import Any
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 
-from src.services.llm_factory import get_llm
 from src.config import settings
+from src.services.llm_factory import get_llm
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class EmailClassifier:
         self.structured_llm = self.llm.with_structured_output(EmailClassificationResult)
 
         allowed_categories = "\n".join(f"- {k}: {v}" for k, v in settings.categories.items())
-        
+
         self.prompt = PromptTemplate.from_template(
             """You are an intelligent email categorizer. Your task is to analyze an incoming email and strictly assign it to one category from the taxonomy below.
 

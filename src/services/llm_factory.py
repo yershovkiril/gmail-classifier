@@ -1,5 +1,6 @@
 import logging
 import os
+
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,9 +20,9 @@ def get_llm() -> BaseChatModel:
             logger.warning("No gemini_api_key detected. The open Gemini API is required for this provider.")
         else:
             os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
-            
+
         return ChatGoogleGenerativeAI(
-            model=settings.llm_model_name, 
+            model=settings.llm_model_name,
             temperature=0.0
         )
     elif settings.llm_provider == "openai":
