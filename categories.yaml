@@ -1,0 +1,10 @@
+# Define your exact email categories here. The AI will strictly choose from these (or 'Other').
+# Give each category a detailed description to heavily constrain the AI's logic.
+
+"❗️ Action required": "The Priority: Your immediate 'to-do' list at the top of the sidebar. Action Required emails, bills that need paying today, urgent requests, and anything requiring an explicit response."
+"💼 Business (JDG)": "Church and State: Keeps your tax/business audit trail 100% separate. JDG, Accounting, legal documents, official tax notices, and business contracts."
+"💸 Finance": "The Wallet: All your personal spending and banking in one spot. Invoices, Bills, Personal Finance updates, receipts, investment statements, and bank alerts."
+"📅 Daily Life": "The Pulse: Your schedule, family logistics, and personal errands. Appointments, Events, Kids, Family, Medical/Dental reminders, and Personal direct emails."
+"📈 Career": "The Path: Specifically for new professional opportunities and networking. Job alerts, LinkedIn requests, recruiter emails, and professional skill-building."
+"📚 Interests": "The Library: High-volume reading, learning, and hobbyist updates. Education, Sports, Tech, Entertainment, newsletters, language courses, and concert alerts."
+"✈️ Travel": "The Escape: Keeps your tickets and bookings easy to find at the airport. Travel, Accommodation, AirBnB, Flight tickets, taxi receipts, and itineraries."

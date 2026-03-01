@@ -8,12 +8,14 @@ from src.services.llm_factory import get_llm
 @patch("src.services.llm_factory.settings")
 def test_get_llm_vertexai(mock_settings: MagicMock) -> None:
     mock_settings.llm_provider = "vertexai"
-    mock_settings.llm_model_name = "gemini-1.5-pro"
+    mock_settings.llm_model_name = "gemini-2.5-flash"
+
+    mock_settings.gemini_api_key = "dummy_key"
 
     # Needs to be mocked to prevent real GCP auth calls during tests
-    with patch("src.services.llm_factory.ChatVertexAI") as mock_vertex:
+    with patch("src.services.llm_factory.ChatGoogleGenerativeAI") as mock_vertex:
         get_llm()
-        mock_vertex.assert_called_once_with(model_name="gemini-1.5-pro", temperature=0.0)
+        mock_vertex.assert_called_once_with(model="gemini-2.5-flash", temperature=0.0, google_api_key=mock_settings.gemini_api_key)
 
 @patch("src.services.llm_factory.settings")
 def test_get_llm_openai(mock_settings: MagicMock) -> None:

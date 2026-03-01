@@ -59,7 +59,10 @@ resource "google_cloud_run_v2_job" "job" {
   location = var.region
 
   template {
+    task_count  = 1
+    
     template {
+      max_retries = 0
       execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
       containers {
         # Deploying strictly with the latest project image natively built by Cloud Build.
@@ -71,12 +74,33 @@ resource "google_cloud_run_v2_job" "job" {
           value = var.llm_provider
         }
         env {
+          name  = "PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "KEEP_UNREAD_DAYS"
+          value = var.keep_unread_days
+        }
+        env {
+          name  = "SUMMARY_FREQUENCY_HOURS"
+          value = var.summary_frequency_hours
+        }
+        env {
           name  = "GMAIL_CREDENTIALS_FILE"
           value = "/secrets/credentials/credentials.json"
         }
         env {
           name  = "GMAIL_TOKEN_FILE"
           value = "/secrets/token/token.json"
+        }
+        env {
+          name = "GEMINI_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.gemini_api_key.secret_id
+              version = "latest"
+            }
+          }
         }
 
         volume_mounts {
@@ -123,10 +147,10 @@ resource "google_cloud_run_v2_job" "job" {
   }
 }
 
-# 5. Cloud Scheduler
-resource "google_cloud_scheduler_job" "trigger" {
-  name             = "${var.app_name}-trigger"
-  description      = "Triggers the AI Gmail Classifier periodically"
+# 5. Cloud Scheduler Triggers
+resource "google_cloud_scheduler_job" "trigger_classify" {
+  name             = "${var.app_name}-trigger-classify"
+  description      = "Triggers the AI Gmail Classifier to route new emails"
   schedule         = var.schedule
   time_zone        = "Etc/UTC"
   attempt_deadline = "30s"
@@ -134,7 +158,74 @@ resource "google_cloud_scheduler_job" "trigger" {
 
   http_target {
     http_method = "POST"
-    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${google_cloud_run_v2_job.job.name}:run"
+    uri         = "https://${var.region}-run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.job.name}:run"
+    body        = base64encode(jsonencode({
+      overrides = {
+        containerOverrides = [
+          {
+            args = ["--mode", "classify"]
+          }
+        ]
+      }
+    }))
+
+    oauth_token {
+      service_account_email = google_service_account.agent_sa.email
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_scheduler_job" "trigger_summary" {
+  name             = "${var.app_name}-trigger-summary"
+  description      = "Triggers the AI Gmail Classifier to send a daily digest"
+  schedule         = var.summary_schedule
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "30s"
+  region           = var.region
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.job.name}:run"
+    body        = base64encode(jsonencode({
+      overrides = {
+        containerOverrides = [
+          {
+            args = ["--mode", "summary"]
+          }
+        ]
+      }
+    }))
+
+    oauth_token {
+      service_account_email = google_service_account.agent_sa.email
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_cloud_scheduler_job" "trigger_cleanup" {
+  name             = "${var.app_name}-trigger-cleanup"
+  description      = "Triggers the AI Gmail Classifier to clear unread marks"
+  schedule         = var.cleanup_schedule
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "30s"
+  region           = var.region
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.job.name}:run"
+    body        = base64encode(jsonencode({
+      overrides = {
+        containerOverrides = [
+          {
+            args = ["--mode", "cleanup"]
+          }
+        ]
+      }
+    }))
 
     oauth_token {
       service_account_email = google_service_account.agent_sa.email
@@ -149,11 +240,19 @@ resource "google_cloud_run_v2_job_iam_member" "invoker" {
   name     = google_cloud_run_v2_job.job.name
   location = google_cloud_run_v2_job.job.location
   project  = google_cloud_run_v2_job.job.project
-  role     = "roles/run.invoker"
+  role     = "roles/run.developer"
   member   = "serviceAccount:${google_service_account.agent_sa.email}"
 }
 
 # 6. Secret Manager for Credentials
+resource "google_secret_manager_secret" "gemini_api_key" {
+  secret_id = "${var.app_name}-gemini-api-key"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
 resource "google_secret_manager_secret" "gmail_credentials" {
   secret_id = "${var.app_name}-gmail-credentials"
   replication {
@@ -170,6 +269,12 @@ resource "google_secret_manager_secret" "gmail_token" {
   depends_on = [google_project_service.apis]
 }
 
+resource "google_secret_manager_secret_iam_member" "sa_gemini_key_access" {
+  secret_id = google_secret_manager_secret.gemini_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "sa_credentials_access" {
   secret_id = google_secret_manager_secret.gmail_credentials.id
   role      = "roles/secretmanager.secretAccessor"
@@ -183,6 +288,15 @@ resource "google_secret_manager_secret_iam_member" "sa_token_access" {
 }
 
 # 7. Auto-populate Secrets from local files (Optional, runs if files exist locally during `terraform apply`)
+resource "google_secret_manager_secret_version" "gemini_api_key_version" {
+  secret      = google_secret_manager_secret.gemini_api_key.id
+  secret_data = var.gemini_api_key
+  
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
+}
+
 resource "google_secret_manager_secret_version" "gmail_credentials_version" {
   secret      = google_secret_manager_secret.gmail_credentials.id
   secret_data = fileexists("../credentials.json") ? file("../credentials.json") : "{}"

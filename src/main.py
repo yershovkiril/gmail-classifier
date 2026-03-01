@@ -1,3 +1,4 @@
+import argparse
 import logging
 import sys
 import time
@@ -5,6 +6,8 @@ import time
 from src.config import settings
 from src.services.classifier import EmailClassifier
 from src.services.gmail import GmailClient
+from src.services.cleanup import run_cleanup
+from src.services.summary import generate_daily_summary
 
 # Setup logging
 logging.basicConfig(
@@ -23,7 +26,7 @@ def process_emails() -> None:
         user_labels = gmail_client.get_user_labels()
         logger.info(f"Retrieved {len(user_labels)} existing user labels from Gmail.")
 
-        classifier = EmailClassifier(existing_labels=user_labels)
+        classifier = EmailClassifier()
     except Exception as e:
         logger.critical(f"Failed to initialize services: {e}")
         return
@@ -47,16 +50,12 @@ def process_emails() -> None:
         category = classifier.classify_email(email_data)
 
         # Enforce Boundary conditions for custom category generation
-        if category not in user_labels:
-            if len(user_labels) >= settings.max_dynamic_categories:
-                logger.warning(f"Maximum dynamic categories ({settings.max_dynamic_categories}) reached. Falling back to 'Other'.")
-                category = "Other"
-            else:
-                logger.info(f"Creating new category: {category}")
-                user_labels.append(category)
+        if category not in settings.categories and category != "Other":
+            logger.warning(f"LLM hallucinated category '{category}'. Falling back to 'Other'.")
+            category = "Other"
 
         # Apply the label
-        gmail_client.apply_category_and_mark_processed(message_id, category)
+        gmail_client.apply_category_and_mark_processed(message_id, category, email_data.get("labelIds", []))
 
         # Small delay to avoid hitting rate limits too fast (optional but good practice)
         time.sleep(0.5)
@@ -65,4 +64,19 @@ def process_emails() -> None:
 
 
 if __name__ == "__main__":
-    process_emails()
+    parser = argparse.ArgumentParser(description="AI Gmail Agent")
+    parser.add_argument(
+        "--mode", 
+        type=str, 
+        choices=["classify", "cleanup", "summary"], 
+        default="classify",
+        help="Execution mode (classify new emails, cleanup old unread, or generate daily summary)."
+    )
+    args = parser.parse_args()
+
+    if args.mode == "classify":
+        process_emails()
+    elif args.mode == "cleanup":
+        run_cleanup()
+    elif args.mode == "summary":
+        generate_daily_summary()

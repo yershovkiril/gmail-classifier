@@ -1,9 +1,13 @@
+import logging
+import os
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_google_vertexai import ChatVertexAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_llm() -> BaseChatModel:
@@ -11,7 +15,15 @@ def get_llm() -> BaseChatModel:
     Factory function to return the configured LLM provider.
     """
     if settings.llm_provider == "vertexai":
-        return ChatVertexAI(model_name=settings.llm_model_name, temperature=0.0)
+        if not settings.gemini_api_key:
+            logger.warning("No gemini_api_key detected. The open Gemini API is required for this provider.")
+        else:
+            os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
+            
+        return ChatGoogleGenerativeAI(
+            model=settings.llm_model_name, 
+            temperature=0.0
+        )
     elif settings.llm_provider == "openai":
         if not settings.openai_api_key:
             raise ValueError("OpenAI API key is missing.")

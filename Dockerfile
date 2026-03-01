@@ -27,6 +27,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the rest of the application code
 COPY src ./src
+COPY categories.yaml ./
 
 # Make sure the virtualenv represents the bin folder explicitly
 ENV PATH="/opt/venv/bin:$PATH"

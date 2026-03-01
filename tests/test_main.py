@@ -3,15 +3,17 @@ from unittest.mock import MagicMock, patch
 from src.main import process_emails
 
 
+@patch("src.main.settings")
 @patch("src.main.GmailClient")
 @patch("src.main.EmailClassifier")
-def test_process_emails_success(mock_classifier_cls: MagicMock, mock_gmail_cls: MagicMock) -> None:
+def test_process_emails_success(mock_classifier_cls: MagicMock, mock_gmail_cls: MagicMock, mock_settings: MagicMock) -> None:
     mock_gmail = MagicMock()
     mock_classifier = MagicMock()
 
     mock_gmail_cls.return_value = mock_gmail
     mock_classifier_cls.return_value = mock_classifier
 
+    mock_settings.categories = {"Ads": "Test", "Other": "Test"}
     mock_gmail.get_user_labels.return_value = ["Ads", "Other"]
 
     # Mock data
@@ -30,8 +32,8 @@ def test_process_emails_success(mock_classifier_cls: MagicMock, mock_gmail_cls: 
     assert mock_classifier.classify_email.call_count == 2
 
     # Check that labels were applied properly
-    mock_gmail.apply_category_and_mark_processed.assert_any_call("1", "Ads")
-    mock_gmail.apply_category_and_mark_processed.assert_any_call("2", "Other")
+    mock_gmail.apply_category_and_mark_processed.assert_any_call("1", "Ads", [])
+    mock_gmail.apply_category_and_mark_processed.assert_any_call("2", "Other", [])
     assert mock_gmail.apply_category_and_mark_processed.call_count == 2
 
 

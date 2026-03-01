@@ -22,7 +22,38 @@ variable "llm_provider" {
 }
 
 variable "schedule" {
-  description = "The cron schedule for the Cloud Scheduler job"
+  description = "The cron schedule for the classify Cloud Scheduler job"
   type        = string
   default     = "*/15 * * * *"
+}
+
+variable "summary_schedule" {
+  description = "The cron schedule for the summary Cloud Scheduler job"
+  type        = string
+  default     = "0 8 * * *"
+}
+
+variable "cleanup_schedule" {
+  description = "The cron schedule for the cleanup Cloud Scheduler job"
+  type        = string
+  default     = "0 2 * * *"
+}
+
+variable "keep_unread_days" {
+  description = "Number of days to keep classified emails unread"
+  type        = string
+  default     = "7"
+}
+
+variable "summary_frequency_hours" {
+  description = "Number of hours to look back when generating the daily summary"
+  type        = string
+  default     = "24"
+}
+
+variable "gemini_api_key" {
+  description = "The Developer API Key for Gemini. Set this via TF_VAR_gemini_api_key or tfvars"
+  type        = string
+  sensitive   = true
+  default     = "PLACEHOLDER_KEY"
 }

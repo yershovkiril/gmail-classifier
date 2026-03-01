@@ -5,34 +5,34 @@ from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 
 from src.services.llm_factory import get_llm
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class EmailClassificationResult(BaseModel):
-    category: str = Field(description="The chosen or newly created category for the email.")
-    is_new: bool = Field(description="True if this is a newly created category, False if it matches an existing one.")
+    category: str = Field(description="The chosen category from the allowed taxonomy.")
 
 
 class EmailClassifier:
-    def __init__(self, existing_labels: list[str] | None = None) -> None:
+    def __init__(self) -> None:
         self.llm = get_llm()
-        self.existing_labels = existing_labels or []
 
-        # We will no longer strictly bind to Literal. The LLM can return any string.
         self.structured_llm = self.llm.with_structured_output(EmailClassificationResult)
 
+        allowed_categories = "\n".join(f"- {k}: {v}" for k, v in settings.categories.items())
+        
         self.prompt = PromptTemplate.from_template(
-            """You are an intelligent email categorizer. Your task is to analyze an incoming email and assign it to a category.
+            """You are an intelligent email categorizer. Your task is to analyze an incoming email and strictly assign it to one category from the taxonomy below.
 
-### EXISTING CATEGORIES:
+### STRICT TAXONOMY:
 {categories_text}
+- Other: "Any emails that do not clearly fit the above descriptions."
 
 ### OPERATIONAL GUIDELINES:
-1. Re-use: If the email strongly fits one of the EXISTING CATEGORIES, you MUST use it exactly as written.
-2. Creation Limit: If it does not fit, you MAY create a concise, short (1-3 words) new category.
-3. Formatting: Categories should be title-cased. e.g "Travel" or "Invoices / Bills".
-4. Context Clues: Look at the sender's domain and the subject line as primary indicators before analyzing the body text.
+1. Strict Selection: You MUST choose EXACTLY ONE category from the STRICT TAXONOMY list (or "Other"). Do not invent new categories.
+2. Description Following: Follow the exact description rules of each category.
+3. Context Clues: Look at the sender's domain and the subject line as primary indicators before analyzing the body text.
 
 ### EMAIL TO ANALYZE:
 Sender: {sender}
@@ -41,7 +41,7 @@ Body snippet: {snippet}
 Body text: {body}
 
 Choose the BEST category for this email."""
-        ).partial(categories_text="\n".join(f"- {c}" for c in self.existing_labels) if self.existing_labels else "None")
+        ).partial(categories_text=allowed_categories)
 
     def classify_email(self, email_data: dict[str, Any]) -> str:
         """

@@ -3,6 +3,7 @@ import logging
 import os.path
 from typing import Any
 
+from email.message import EmailMessage
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
@@ -14,10 +15,16 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.compose"]
 
 
 class GmailClient:
+    SYSTEM_LABELS = {
+        "INBOX", "UNREAD", "SENT", "DRAFT", "SPAM", "TRASH", "STARRED", 
+        "IMPORTANT", "CHAT", "CATEGORY_PERSONAL", "CATEGORY_SOCIAL", 
+        "CATEGORY_PROMOTIONS", "CATEGORY_UPDATES", "CATEGORY_FORUMS"
+    }
+
     def __init__(self) -> None:
         self.creds = self._authenticate()
         if not self.creds:
@@ -130,6 +137,7 @@ class GmailClient:
 
         return {
             "id": message["id"],
+            "labelIds": message.get("labelIds", []),
             "subject": subject,
             "sender": sender,
             "body": body,
@@ -153,25 +161,33 @@ class GmailClient:
         """Returns a list of label names representing user-created categories."""
         # Filter out built-in gmail system labels (which are usually UPPERCASE like INBOX, UNREAD, SENT)
         # and our own processed tracker.
-        system_labels = {"INBOX", "UNREAD", "SENT", "DRAFT", "SPAM", "TRASH", "STARRED", "IMPORTANT", "CHAT", "CATEGORY_PERSONAL", "CATEGORY_SOCIAL", "CATEGORY_PROMOTIONS", "CATEGORY_UPDATES", "CATEGORY_FORUMS"}
-
         user_labels = []
         for name in self._label_cache.keys():
-            if name not in system_labels and name != settings.processed_label_name:
+            if name not in self.SYSTEM_LABELS and name != settings.processed_label_name:
                 user_labels.append(name)
         return user_labels
 
-    def apply_category_and_mark_processed(self, message_id: str, category_name: str) -> None:
+    def apply_category_and_mark_processed(self, message_id: str, category_name: str, existing_label_ids: list[str] = None) -> None:
         """
         Adds the category label and the PROCESSED_BY_AI label to the message.
+        Also strips out previous custom tags.
         """
         try:
             category_label_id = self.get_or_create_label(category_name)
             processed_label_id = self.get_or_create_label(settings.processed_label_name)
 
+            labels_to_remove = []
+            
+            # Remove any pre-existing custom user labels
+            if existing_label_ids:
+                user_label_ids = {l_id for name, l_id in self._label_cache.items() if name not in self.SYSTEM_LABELS}
+                for l_id in existing_label_ids:
+                    if l_id in user_label_ids and l_id not in (category_label_id, processed_label_id):
+                        labels_to_remove.append(l_id)
+
             body = {
                 "addLabelIds": [category_label_id, processed_label_id],
-                "removeLabelIds": [],  # Explicitly not removing UNREAD
+                "removeLabelIds": labels_to_remove,
             }
 
             self.service.users().messages().modify(userId="me", id=message_id, body=body).execute()
@@ -181,3 +197,53 @@ class GmailClient:
 
         except HttpError as error:
             logger.error(f"An error occurred modifying message {message_id}: {error}")
+
+    def get_recent_emails(self, hours: int = 24) -> list[dict[str, Any]]:
+        """
+        Queries for all emails received in the last N hours, regardless of label.
+        """
+        query = f"newer_than:{hours}h"
+
+        try:
+            results = (
+                self.service.users()
+                .messages()
+                .list(userId="me", q=query, maxResults=500)
+                .execute()
+            )
+            messages = results.get("messages", [])
+
+            email_data = []
+            for msg in messages:
+                full_msg = (
+                    self.service.users()
+                    .messages()
+                    .get(userId="me", id=msg["id"], format="full")
+                    .execute()
+                )
+                email_data.append(self._parse_message(full_msg))
+            return email_data
+        except HttpError as error:
+            logger.error(f"An error occurred fetching recent messages: {error}")
+            return []
+
+    def send_email(self, subject: str, html_body: str) -> None:
+        """Sends an HTML email to the authenticated user's own address."""
+        # Get the authenticated user's email address
+        profile = self.service.users().getProfile(userId="me").execute()
+        user_email = profile.get("emailAddress", "me")
+
+        message = EmailMessage()
+        message.set_content(html_body, subtype="html")
+        message["To"] = user_email
+        message["From"] = user_email
+        message["Subject"] = subject
+
+        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        create_message = {"raw": encoded_message}
+
+        try:
+            self.service.users().messages().send(userId="me", body=create_message).execute()
+            logger.info(f"Successfully sent summary email to {user_email}")
+        except HttpError as error:
+            logger.error(f"Failed to send email: {error}")

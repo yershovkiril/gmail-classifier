@@ -3,13 +3,15 @@ from unittest.mock import MagicMock, patch
 from src.services.classifier import EmailClassifier
 
 
+@patch("src.services.classifier.settings")
 @patch("src.services.classifier.get_llm")
-def test_classifier_initialization(mock_get_llm: MagicMock) -> None:
+def test_classifier_initialization(mock_get_llm: MagicMock, mock_settings: MagicMock) -> None:
     # Mock LLM to prevent real calls
     mock_llm = MagicMock()
     mock_get_llm.return_value = mock_llm
+    mock_settings.categories = {"Ads": "Test description", "Invoices / Bills": "Test description"}
 
-    classifier = EmailClassifier(existing_labels=["Ads", "Invoices / Bills"])
+    classifier = EmailClassifier()
     assert classifier.prompt is not None
     assert classifier.structured_llm is not None
 
