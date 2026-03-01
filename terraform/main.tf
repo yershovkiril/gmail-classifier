@@ -20,7 +20,8 @@ resource "google_project_service" "apis" {
     "cloudscheduler.googleapis.com",
     "cloudbuild.googleapis.com",
     "artifactregistry.googleapis.com",
-    "secretmanager.googleapis.com"
+    "secretmanager.googleapis.com",
+    "gmail.googleapis.com"
   ])
   project            = var.project_id
   service            = each.key
@@ -59,11 +60,11 @@ resource "google_cloud_run_v2_job" "job" {
 
   template {
     template {
+      execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
       containers {
-        # Using a dummy public image just so terraform can initialize the job resource
-        # The true image will be deployed via CI/CD (Cloud Build) using `gcloud run jobs update`
-        image   = "alpine:latest"
-        command = ["echo", "Initial Setup"]
+        # Deploying strictly with the latest project image natively built by Cloud Build.
+        # This requires `cloudbuild.yaml` to run before `terraform apply` fully succeeds.
+        image   = "${var.region}-docker.pkg.dev/${var.project_id}/${var.app_name}-repo/gmail-agent:latest"
 
         env {
           name  = "LLM_PROVIDER"
@@ -190,4 +191,19 @@ resource "google_secret_manager_secret_version" "gmail_credentials_version" {
 resource "google_secret_manager_secret_version" "gmail_token_version" {
   secret      = google_secret_manager_secret.gmail_token.id
   secret_data = fileexists("../token.json") ? file("../token.json") : "{}"
+}
+
+# 8. Grant Cloud Build Service Account permissions to update Cloud Run jobs during CI/CD
+data "google_project" "project" {}
+
+resource "google_project_iam_member" "cloudbuild_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "cloudbuild_sa_user" {
+  service_account_id = google_service_account.agent_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
 }

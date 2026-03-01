@@ -22,10 +22,12 @@ deploy:
 		echo "Error: Please specify PROJECT_ID. Usage: make deploy PROJECT_ID=my-gcp-project"; \
 		exit 1; \
 	fi
-	@echo "Deploying infrastructure via Terraform..."
-	cd terraform && terraform init && terraform apply -var="project_id=$(PROJECT_ID)" -auto-approve
-	@echo "Building and pushing container via Cloud Build..."
-	gcloud builds submit --config cloudbuild.yaml --project=$(PROJECT_ID) .
+	@echo "1. Provisioning base infrastructure (APIs and Artifact Registry) via Terraform..."
+	cd terraform && terraform init && terraform apply -target="google_artifact_registry_repository.repo" -target="google_project_service.apis" -var="project_id=$(PROJECT_ID)" -auto-approve
+	@echo "2. Building and pushing real container image via Cloud Build..."
+	gcloud builds submit --config cloudbuild.yaml --substitutions=COMMIT_SHA=$$(git rev-parse --short HEAD) --project=$(PROJECT_ID) .
+	@echo "3. Deploying Cloud Run Job and Cloud Scheduler with latest image..."
+	cd terraform && terraform apply -var="project_id=$(PROJECT_ID)" -auto-approve
 
 test:
 	@echo "Running tests..."

@@ -19,20 +19,21 @@ steps:
       - 'push'
       - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
 
-  # 3. Update the Cloud Run Job to use the newly built image
+  # 3. Update the Cloud Run Job to use the newly built image only if it already exists
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - 'run'
-      - 'jobs'
-      - 'update'
-      - '${_JOB_NAME}'
-      - '--image'
-      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
-      - '--region'
-      - '${_REGION}'
-      - '--command'
-      - 'python,-m,src.main' # Restoring the correct container CMD
+      - '-c'
+      - |
+        if gcloud run jobs describe ${_JOB_NAME} --region=${_REGION} > /dev/null 2>&1; then
+          echo "Job exists. Updating with new image..."
+          gcloud run jobs update ${_JOB_NAME} \
+            --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA \
+            --region ${_REGION} \
+            --command python,-m,src.main
+        else
+          echo "Job does not exist yet. Skipping update (Terraform will create it)."
+        fi
 
 substitutions:
   _REGION: 'us-central1'
