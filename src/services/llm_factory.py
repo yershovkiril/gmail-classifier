@@ -17,16 +17,16 @@ def get_llm() -> BaseChatModel:
             raise ValueError("OpenAI API key is missing.")
         return ChatOpenAI(
             model=settings.llm_model_name,
-            api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key, # type: ignore
             temperature=0.0,
-        )
+        ) # type: ignore
     elif settings.llm_provider == "anthropic":
         if not settings.anthropic_api_key:
             raise ValueError("Anthropic API key is missing.")
         return ChatAnthropic(
             model_name=settings.llm_model_name,
-            api_key=settings.anthropic_api_key,
+            api_key=settings.anthropic_api_key, # type: ignore
             temperature=0.0,
-        )
+        ) # type: ignore
     else:
         raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")

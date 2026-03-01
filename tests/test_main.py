@@ -5,12 +5,14 @@ from src.main import process_emails
 
 @patch("src.main.GmailClient")
 @patch("src.main.EmailClassifier")
-def test_process_emails_success(mock_classifier_cls, mock_gmail_cls):
+def test_process_emails_success(mock_classifier_cls: MagicMock, mock_gmail_cls: MagicMock) -> None:
     mock_gmail = MagicMock()
     mock_classifier = MagicMock()
 
     mock_gmail_cls.return_value = mock_gmail
     mock_classifier_cls.return_value = mock_classifier
+
+    mock_gmail.get_user_labels.return_value = ["Ads", "Other"]
 
     # Mock data
     mock_gmail.get_emails_to_process.return_value = [
@@ -35,12 +37,14 @@ def test_process_emails_success(mock_classifier_cls, mock_gmail_cls):
 
 @patch("src.main.GmailClient")
 @patch("src.main.EmailClassifier")
-def test_process_emails_empty(mock_classifier_cls, mock_gmail_cls):
+def test_process_emails_empty(mock_classifier_cls: MagicMock, mock_gmail_cls: MagicMock) -> None:
     mock_gmail = MagicMock()
     mock_classifier = MagicMock()
 
     mock_gmail_cls.return_value = mock_gmail
     mock_classifier_cls.return_value = mock_classifier
+
+    mock_gmail.get_user_labels.return_value = ["Ads"]
 
     # Return empty list
     mock_gmail.get_emails_to_process.return_value = []
@@ -53,7 +57,7 @@ def test_process_emails_empty(mock_classifier_cls, mock_gmail_cls):
 
 @patch("src.main.GmailClient")
 @patch("src.main.EmailClassifier")
-def test_process_emails_initialization_error(mock_classifier_cls, mock_gmail_cls):
+def test_process_emails_initialization_error(mock_classifier_cls: MagicMock, mock_gmail_cls: MagicMock) -> None:
     # If a service fails to connect, process gracefully shuts down
     mock_gmail_cls.side_effect = ValueError("OAuth Error")
 

@@ -49,7 +49,7 @@ Choose the BEST category for this email."""
         """
         try:
             chain = self.prompt | self.structured_llm
-            result: EmailClassificationResult = chain.invoke(
+            result: EmailClassificationResult = chain.invoke(  # type: ignore
                 {
                     "sender": email_data.get("sender", ""),
                     "subject": email_data.get("subject", ""),
