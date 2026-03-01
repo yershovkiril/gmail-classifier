@@ -1,0 +1,32 @@
+from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_google_vertexai import ChatVertexAI
+from langchain_openai import ChatOpenAI
+
+from src.config import settings
+
+
+def get_llm() -> BaseChatModel:
+    """
+    Factory function to return the configured LLM provider.
+    """
+    if settings.llm_provider == "vertexai":
+        return ChatVertexAI(model_name=settings.llm_model_name, temperature=0.0)
+    elif settings.llm_provider == "openai":
+        if not settings.openai_api_key:
+            raise ValueError("OpenAI API key is missing.")
+        return ChatOpenAI(
+            model=settings.llm_model_name,
+            api_key=settings.openai_api_key,
+            temperature=0.0,
+        )
+    elif settings.llm_provider == "anthropic":
+        if not settings.anthropic_api_key:
+            raise ValueError("Anthropic API key is missing.")
+        return ChatAnthropic(
+            model_name=settings.llm_model_name,
+            api_key=settings.anthropic_api_key,
+            temperature=0.0,
+        )
+    else:
+        raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")

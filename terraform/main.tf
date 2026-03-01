@@ -1,0 +1,193 @@
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+# 1. Enable Required APIs
+resource "google_project_service" "apis" {
+  for_each = toset([
+    "run.googleapis.com",
+    "cloudscheduler.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "secretmanager.googleapis.com"
+  ])
+  project            = var.project_id
+  service            = each.key
+  disable_on_destroy = false
+}
+
+# 2. Artifact Registry for Docker Images
+resource "google_artifact_registry_repository" "repo" {
+  provider      = google
+  location      = var.region
+  repository_id = "${var.app_name}-repo"
+  description   = "Docker repository for the AI Gmail Classifier"
+  format        = "DOCKER"
+  depends_on    = [google_project_service.apis]
+}
+
+# 3. Dedicated Service Account
+resource "google_service_account" "agent_sa" {
+  account_id   = "${var.app_name}-sa"
+  display_name = "Service Account for AI Gmail Classifier"
+}
+
+# Assign roles to the SA (e.g., Vertex AI if using Gemini)
+resource "google_project_iam_member" "sa_ai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
+# 4. Cloud Run Job
+# NOTE: The initial apply requires a valid image. We use a placeholder alpine image 
+# to bootstrap, which Cloud Build will overwrite on its first CI/CD run.
+resource "google_cloud_run_v2_job" "job" {
+  name     = "${var.app_name}-job"
+  location = var.region
+
+  template {
+    template {
+      containers {
+        # Using a dummy public image just so terraform can initialize the job resource
+        # The true image will be deployed via CI/CD (Cloud Build) using `gcloud run jobs update`
+        image   = "alpine:latest"
+        command = ["echo", "Initial Setup"]
+
+        env {
+          name  = "LLM_PROVIDER"
+          value = var.llm_provider
+        }
+        env {
+          name  = "GMAIL_CREDENTIALS_FILE"
+          value = "/secrets/credentials/credentials.json"
+        }
+        env {
+          name  = "GMAIL_TOKEN_FILE"
+          value = "/secrets/token/token.json"
+        }
+
+        volume_mounts {
+          name       = "credentials-volume"
+          mount_path = "/secrets/credentials"
+        }
+        volume_mounts {
+          name       = "token-volume"
+          mount_path = "/secrets/token"
+        }
+      }
+      service_account = google_service_account.agent_sa.email
+
+      volumes {
+        name = "credentials-volume"
+        secret {
+          secret = google_secret_manager_secret.gmail_credentials.secret_id
+          items {
+            version = "latest"
+            path    = "credentials.json"
+          }
+        }
+      }
+      volumes {
+        name = "token-volume"
+        secret {
+          secret = google_secret_manager_secret.gmail_token.secret_id
+          items {
+            version = "latest"
+            path    = "token.json"
+          }
+        }
+      }
+    }
+  }
+  depends_on = [google_project_service.apis]
+
+  # Ignore the image and command changes in Terraform as they will be managed by Cloud Build
+  lifecycle {
+    ignore_changes = [
+      template[0].template[0].containers[0].image,
+      template[0].template[0].containers[0].command
+    ]
+  }
+}
+
+# 5. Cloud Scheduler
+resource "google_cloud_scheduler_job" "trigger" {
+  name             = "${var.app_name}-trigger"
+  description      = "Triggers the AI Gmail Classifier periodically"
+  schedule         = var.schedule
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "30s"
+  region           = var.region
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${google_cloud_run_v2_job.job.name}:run"
+
+    oauth_token {
+      service_account_email = google_service_account.agent_sa.email
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+# Give the SA permission to invoke the Cloud Run Job
+resource "google_cloud_run_v2_job_iam_member" "invoker" {
+  name     = google_cloud_run_v2_job.job.name
+  location = google_cloud_run_v2_job.job.location
+  project  = google_cloud_run_v2_job.job.project
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
+# 6. Secret Manager for Credentials
+resource "google_secret_manager_secret" "gmail_credentials" {
+  secret_id = "${var.app_name}-gmail-credentials"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret" "gmail_token" {
+  secret_id = "${var.app_name}-gmail-token"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_iam_member" "sa_credentials_access" {
+  secret_id = google_secret_manager_secret.gmail_credentials.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "sa_token_access" {
+  secret_id = google_secret_manager_secret.gmail_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.agent_sa.email}"
+}
+
+# 7. Auto-populate Secrets from local files (Optional, runs if files exist locally during `terraform apply`)
+resource "google_secret_manager_secret_version" "gmail_credentials_version" {
+  secret      = google_secret_manager_secret.gmail_credentials.id
+  secret_data = fileexists("../credentials.json") ? file("../credentials.json") : "{}"
+}
+
+resource "google_secret_manager_secret_version" "gmail_token_version" {
+  secret      = google_secret_manager_secret.gmail_token.id
+  secret_data = fileexists("../token.json") ? file("../token.json") : "{}"
+}
