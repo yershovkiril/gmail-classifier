@@ -21,7 +21,8 @@ resource "google_project_service" "apis" {
     "cloudbuild.googleapis.com",
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
-    "gmail.googleapis.com"
+    "gmail.googleapis.com",
+    "aiplatform.googleapis.com"
   ])
   project            = var.project_id
   service            = each.key

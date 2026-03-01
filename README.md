@@ -49,16 +49,6 @@ Entertainment: "Movies, concerts, events. Do not put travel here."
 
 The infrastructure for this project is entirely defined via Terraform and dynamically deployed via Cloud Build.
 
-### 1. Requirements
-Ensure your GCP project has the following APIs enabled:
-- Cloud Run API
-- Cloud Build API
-- Artifact Registry API
-- Cloud Scheduler API
-- Secret Manager API
-- Vertex AI API (If using Gemini)
-
-### 2. Deploy infrastructure & Application
 Deploying to production takes just a single command. The script will automatically parse your local `credentials.json` and `token.json`, upload them securely to **GCP Secret Manager**, provision the Cloud Run infrastructure, build your image, and trigger the deployment:
 
 ```bash
