@@ -4,7 +4,7 @@ This is an AI Agent that reads UNREAD emails from your Gmail account, classifies
 
 ## Features
 - Fetches exclusively `UNREAD` emails that lack the `PROCESSED_BY_AI` label.
-- Uses strict structured output conforming to precise user-defined categories.
+- Uses dynamic open-ended classification. The system detects your custom Gmail labels and assigns incoming emails to them. If no existing label fits, the AI will invent a new concise category (up to your configured limit).
 - Leaves the email as `UNREAD` but adds `PROCESSED_BY_AI` to ensure it isn't processed repeatedly.
 - Supports Vertex AI (Gemini), OpenAI, and Anthropic.
 
@@ -31,6 +31,9 @@ LLM_MODEL_NAME="gemini-1.5-pro" # Change if using a different provider
 
 # Example configuration of run limits:
 MAX_EMAILS_PER_RUN=50
+
+# Limit the amount of novel new folders the LLM is allowed to generate on the fly
+MAX_DYNAMIC_CATEGORIES=100
 ```
 
 ## GCP Production Deployment (CI/CD)
